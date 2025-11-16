@@ -152,13 +152,6 @@ class SessionPhotoBulkUploadView(generics.GenericAPIView):
 # ========== ПОИСК ПО ЛИЦУ ==========
 
 class FaceSearchView(generics.GenericAPIView):
-    """
-    POST /api/search-by-face/
-    Form-data:
-      image: <file с лицом>
-
-    Возвращает список фото с похожим лицом.
-    """
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
 
@@ -167,7 +160,6 @@ class FaceSearchView(generics.GenericAPIView):
         if not file:
             return Response({"detail": "Не передано поле 'image'"}, status=400)
 
-        # БЕЗ распаковки, только одно значение
         encoding = extract_face_encoding_from_file(file)
         if encoding is None:
             return Response(
@@ -175,10 +167,9 @@ class FaceSearchView(generics.GenericAPIView):
                 status=400,
             )
 
-        # Ищем по всем фотографиям (только по тем, где есть encoding)
         photos = SessionPhoto.objects.all()
         matches = []
-        THRESHOLD = 0.6  # меньше — строже
+        THRESHOLD = 0.6
 
         for p in photos:
             if not p.face_encoding:
