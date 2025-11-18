@@ -5,9 +5,12 @@ from .views import (
     RegisterView,
     login_view,
     PhotographerMeView,
+    PhotographerDashboardView,
     PhotoSessionViewSet,
     SessionPhotoBulkUploadView,
     FaceSearchView,
+    PhotoOrderCreateView,
+    SessionPhotoListView
 )
 
 router = DefaultRouter()
@@ -20,6 +23,7 @@ urlpatterns = [
 
     # личный кабинет фотографа
     path("me/", PhotographerMeView.as_view(), name="me"),
+    path("me/dashboard/", PhotographerDashboardView.as_view(), name="dashboard"),
 
     # CRUD сессий
     path("", include(router.urls)),
@@ -33,4 +37,9 @@ urlpatterns = [
 
     # поиск по лицу
     path("search-by-face/", FaceSearchView.as_view(), name="face-search"),
+
+    # заказ после оплаты
+    path("orders/", PhotoOrderCreateView.as_view(), name="orders-create"),
+    path("photos/", SessionPhotoListView.as_view(), name="photos-list"),
+
 ]

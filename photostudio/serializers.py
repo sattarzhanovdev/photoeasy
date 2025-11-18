@@ -1,6 +1,9 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Photographer, PhotoSession, SessionPhoto
+
+from .models import Photographer, PhotoSession, SessionPhoto, PhotoOrder
+
+User = get_user_model()
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
@@ -47,6 +50,8 @@ class PhotoSessionSerializer(serializers.ModelSerializer):
             "view_code",
             "download_code",
             "created_at",
+            "date",
+            "price",  # стоимость фотосессии
         ]
         read_only_fields = ["view_code", "download_code", "created_at"]
 
@@ -54,5 +59,53 @@ class PhotoSessionSerializer(serializers.ModelSerializer):
 class SessionPhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = SessionPhoto
-        fields = ["id", "image", "uploaded_at"]
-        read_only_fields = ["id", "uploaded_at"]
+        fields = ["id", "original_image", "watermarked_image", "uploaded_at"]
+        read_only_fields = ["id", "uploaded_at", "watermarked_image"]
+        # original_image – пишем, watermarked_image – только читаем
+
+
+class PhotoOrderSerializer(serializers.ModelSerializer):
+    photos = serializers.PrimaryKeyRelatedField(
+        queryset=SessionPhoto.objects.all(),
+        many=True,
+    )
+
+    class Meta:
+        model = PhotoOrder
+        fields = [
+            "id",
+            "session",
+            "client_name",
+            "client_phone",
+            "paid_at",
+            "amount",
+            "photos",
+        ]
+        read_only_fields = ["id"]
+
+    def create(self, validated_data):
+        photos = validated_data.pop("photos", [])
+        order = PhotoOrder.objects.create(**validated_data)
+        if photos:
+            order.photos.set(photos)
+        return order
+
+class SessionPhotoGallerySerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    client_name = serializers.CharField(source="session.client_name")
+
+    class Meta:
+        model = SessionPhoto
+        fields = ["id", "image_url", "client_name"]
+
+    def get_image_url(self, obj):
+        # отдаём водяной знак, если есть, иначе оригинал
+        if obj.watermarked_image:
+            url = obj.watermarked_image.url
+        else:
+            url = obj.original_image.url
+
+        request = self.context.get("request")
+        if request is not None:
+            return request.build_absolute_uri(url)
+        return url
