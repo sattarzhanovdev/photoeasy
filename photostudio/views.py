@@ -270,25 +270,27 @@ class PhotoOrderCreateView(generics.CreateAPIView):
 
         serializer.save(photographer=photographer, session=session)
 
-
 class SessionPhotoListView(generics.ListAPIView):
     """
     GET /api/photos/?view_code=ABCD1234
 
-    Возвращает фото (с водяным знаком) для фотосессии с указанным view_code.
-    Без кода – ничего не отдаём.
+    Возвращает фото (с водяным знаком) для фотосессии с указанным view_code
+    + download_code этой сессии.
     """
     serializer_class = SessionPhotoGallerySerializer
-    permission_classes = [AllowAny]  # чтобы клиенты могли заходить без токена
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         view_code = self.request.query_params.get("view_code")
 
+        # чтобы list() мог достать эту сессию
+        self.session = None
+
         if not view_code:
-            # без кода ничего не отдаём
             return SessionPhoto.objects.none()
 
         session = get_object_or_404(PhotoSession, view_code=view_code)
+        self.session = session
 
         return (
             SessionPhoto.objects
@@ -296,3 +298,22 @@ class SessionPhotoListView(generics.ListAPIView):
             .select_related("session")
             .order_by("uploaded_at")
         )
+
+    def list(self, request, *args, **kwargs):
+        # стандартный список фоток
+        response = super().list(request, *args, **kwargs)
+
+        # если сессия найдена – оборачиваем ответ
+        if getattr(self, "session", None):
+            return Response({
+                "session": {
+                    "id": self.session.id,
+                    "client_name": self.session.client_name,
+                    "view_code": self.session.view_code,
+                    "download_code": self.session.download_code,
+                },
+                "photos": response.data,
+            })
+
+        # если кода нет – вернётся пустой список
+        return response
