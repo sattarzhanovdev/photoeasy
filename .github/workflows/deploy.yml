@@ -1,0 +1,41 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout resository
+        uses: actions/checkout@v4
+
+      - name: Sync project files to VPS
+        uses: burnett01/rsync-deployments@5.2
+        with:
+          switches: -avz --delete
+          path: .
+          remote_path: ~/app
+          remote_host: ${{ secrets.SERVER_IP }}
+          remote_user: ${{ secrets.SERVER_USER }}
+          remote_key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: VPS Deploy (build image)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd ~/app
+
+            # Остановим контейнеры и удалим старые образы
+            docker compose -f deploy/prod/docker-compose.yml down --rmi all
+
+            # Собираем Docker image и запускаем контейнеры
+            docker compose -f deploy/prod/docker-compose.yml build
+            docker compose -f deploy/prod/docker-compose.yml up -d
