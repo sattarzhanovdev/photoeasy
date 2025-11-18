@@ -34,8 +34,8 @@ jobs:
             cd ~/app
 
             # Остановим контейнеры и удалим старые образы
-            docker compose -f deploy/prod/docker-compose.yml down --rmi all
+            docker compose -f deploy/prod/docker-compose.yaml down --rmi all
 
             # Собираем Docker image и запускаем контейнеры
-            docker compose -f deploy/prod/docker-compose.yml build
-            docker compose -f deploy/prod/docker-compose.yml up -d
+            docker compose -f deploy/prod/docker-compose.yaml build
+            docker compose -f deploy/prod/docker-compose.yaml up -d
