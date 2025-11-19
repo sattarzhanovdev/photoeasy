@@ -25,7 +25,7 @@ services:
     networks:
       - internal
     restart: unless-stopped
-    env_file: /etc/snap-ai/.env
+    env_file: /etc/photoeasy/.env
 
   nginx:
     image: nginx:latest
@@ -36,13 +36,12 @@ services:
       - internal
     ports:
       - "80:80"
-      - "443:443"
+#      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+#      - /etc/letsencrypt:/etc/letsencrypt:ro
       - media_volume:/app/media
       - static_volume:/app/static
-      - ../../index.html:/usr/share/nginx/html/index.html:ro
     depends_on:
       - backend
     restart: unless-stopped

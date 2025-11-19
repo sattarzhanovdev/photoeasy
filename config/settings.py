@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'corsheaders',
     "rest_framework.authtoken",  # это уже часть djangorestframework
     "photostudio",
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
@@ -74,6 +75,16 @@ TEMPLATES = [
         },
     },
 ]
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'PhotoEasy',
+    'DESCRIPTION': 'Take photo with ease',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
@@ -138,4 +149,4 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SUPERUSER_EMAIL = os.getenv('SUPERUSER_EMAIL', default='admin123@example.com')
 SUPERUSER_NAME = os.getenv('SUPERUSER_NAME', default='admin123')
-SUPERUSER_PASSWORD = os.getenv('SUPERUSER_PASSWORD', default='5V,&N&nE=54u')
+SUPERUSER_PASSWORD = os.getenv('SUPERUSER_PASSWORD', default='super-secret')

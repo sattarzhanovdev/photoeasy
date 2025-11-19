@@ -16,7 +16,7 @@ RUN apt-get update -y && \
 # Install dependencies
 COPY req.txt .
 
-RUN pip install --no-cache-dir -r req.txt
+RUN uv pip install --no-cache-dir -r req.txt --system
 #RUN --mount=type=cache,target=/root/.cache/uv \
 #    --mount=type=bind,source=uv.lock,target=uv.lock \
 #    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
