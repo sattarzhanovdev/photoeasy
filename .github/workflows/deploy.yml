@@ -42,7 +42,7 @@ jobs:
           echo "ROOT:"
           ls -R .
           echo "Check specific file:"
-          ls -l deploy/prod/ || echo "Directory deploy/prod/ NOT FOUND"
+          ls -l ./deploy/prod/ || echo "Directory deploy/prod/ NOT FOUND"
       - name: Copy required files
         uses: appleboy/scp-action@v1
         with:
