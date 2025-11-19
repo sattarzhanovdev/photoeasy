@@ -42,16 +42,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Show tracked files
-        run: |
-          echo "Git tracked files:"
-          git ls-files
-      - name: Debug files
-        run: |
-          echo "ROOT:"
-          ls -R .
-          echo "Check specific file:"
-          ls -l ./deploy/prod/ || echo "Directory deploy/prod/ NOT FOUND"
       - name: Copy required files
         uses: appleboy/scp-action@v1
         with:
@@ -59,7 +49,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: deploy/prod/docker-compose.yaml
-          target: ~/app/
+          target: ~/app/docker-compose.yaml
 
       - name: VPS Deploy
         uses: appleboy/ssh-action@v1.2.0
