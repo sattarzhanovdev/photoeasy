@@ -10,7 +10,9 @@ RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
-    pkg-config && \
+    pkg-config \
+    libavutil-dev \
+    && \
     rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
