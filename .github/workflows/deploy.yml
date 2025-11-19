@@ -48,7 +48,7 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: deploy/prod/docker-compose.yaml
+          source: deploy/prod/
           target: ~/app/
 
       - name: VPS Deploy
