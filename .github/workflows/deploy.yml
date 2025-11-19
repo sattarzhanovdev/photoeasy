@@ -50,6 +50,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: deploy/prod/
           target: ~/app/
+          strip_components: 1
 
       - name: VPS Deploy
         uses: appleboy/ssh-action@v1.2.0
