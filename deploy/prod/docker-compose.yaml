@@ -9,10 +9,7 @@ volumes:
 
 services:
   backend:
-    container_name: backend
-    build:
-      context: ../../
-      dockerfile: Dockerfile
+    image: sashapenkin12/backend:latest
     mem_limit: 1g
     cpus: 0.5
 

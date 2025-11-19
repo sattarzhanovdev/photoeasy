@@ -38,5 +38,5 @@ jobs:
             docker compose -f deploy/prod/docker-compose.yaml down --rmi all
 
             # Собираем Docker image и запускаем контейнеры
-            docker compose -f deploy/prod/docker-compose.yaml build
+            docker compose -f deploy/prod/docker-compose.yaml pull
             docker compose -f deploy/prod/docker-compose.yaml up -d
