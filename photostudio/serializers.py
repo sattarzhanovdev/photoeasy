@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Photographer, PhotoSession, SessionPhoto, PhotoOrder
+from .models import Photographer, PhotoSession, SessionPhoto, PhotoOrder, Service
 
 User = get_user_model()
 
@@ -64,30 +64,49 @@ class SessionPhotoSerializer(serializers.ModelSerializer):
         # original_image – пишем, watermarked_image – только читаем
 
 
+class ServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Service
+        fields = ["id", "name", "price"]
 class PhotoOrderSerializer(serializers.ModelSerializer):
     photos = serializers.PrimaryKeyRelatedField(
-        queryset=SessionPhoto.objects.all(),
         many=True,
+        queryset=SessionPhoto.objects.all(),
+        required=False,
+    )
+    services = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Service.objects.all(),
+        required=False,
     )
 
     class Meta:
         model = PhotoOrder
         fields = [
             "id",
+            "photographer",
             "session",
             "client_name",
             "client_phone",
             "paid_at",
             "amount",
             "photos",
+            "services",
+            "created_at",
         ]
-        read_only_fields = ["id"]
+        read_only_fields = ("photographer", "session", "created_at")
 
     def create(self, validated_data):
         photos = validated_data.pop("photos", [])
+        services = validated_data.pop("services", [])
+
         order = PhotoOrder.objects.create(**validated_data)
+
         if photos:
             order.photos.set(photos)
+        if services:
+            order.services.set(services)
+
         return order
 
 class SessionPhotoGallerySerializer(serializers.ModelSerializer):

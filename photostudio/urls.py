@@ -4,13 +4,14 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     RegisterView,
     login_view,
-    PhotographerMeView,
-    PhotographerDashboardView,
     PhotoSessionViewSet,
     SessionPhotoBulkUploadView,
     FaceSearchView,
     PhotoOrderCreateView,
-    SessionPhotoListView
+    SessionPhotoListView, 
+    ServiceListView, 
+    dashboard_view, 
+    dashboard_export_xlsx
 )
 
 router = DefaultRouter()
@@ -22,11 +23,8 @@ urlpatterns = [
     path("auth/login/", login_view, name="login"),
 
     # личный кабинет фотографа
-    path("me/", PhotographerMeView.as_view(), name="me"),
-    path("me/dashboard/", PhotographerDashboardView.as_view(), name="dashboard"),
-
-    # CRUD сессий
-    path("", include(router.urls)),
+    path("dashboard/", dashboard_view, name="dashboard"),
+    path("dashboard/export/", dashboard_export_xlsx, name="dashboard_export"),
 
     # массовая загрузка фото
     path(
@@ -34,6 +32,8 @@ urlpatterns = [
         SessionPhotoBulkUploadView.as_view(),
         name="session-photo-bulk-upload",
     ),
+    
+    path("services/", ServiceListView.as_view(), name="service-list"),
 
     # поиск по лицу
     path("search-by-face/", FaceSearchView.as_view(), name="face-search"),

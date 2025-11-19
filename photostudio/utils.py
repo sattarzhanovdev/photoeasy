@@ -121,48 +121,109 @@ def face_distance(enc1: List[float], enc2: List[float]) -> float:
     return math.sqrt(sum((a - b) ** 2 for a, b in zip(enc1, enc2)))
 
 
-def add_watermark_to_bytes(data: bytes, text: str = "WATERMARK") -> bytes:
+def add_watermark_to_bytes(data: bytes, text: str = "photoeasy") -> bytes:
     """
-    Создаёт копию изображения с текстовым водяным знаком.
+    Создаёт копию изображения с водяным знаком в стиле "сеткой" по диагонали.
+    - Сжимает изображение по ширине до 1000 px, если оно больше.
+    - Лицо остаётся чистым (область лица вырезается из слоя с водяным знаком).
     Возвращает bytes JPEG.
     """
+    # 1. Загружаем и нормализуем изображение
     img = _load_image_safely(data)
     width, height = img.size
 
-    draw = ImageDraw.Draw(img)
+    # 2. Сжатие до ширины 1000 px (если нужно)
+    max_width = 1000
+    if width > max_width:
+        ratio = max_width / float(width)
+        new_height = int(height * ratio)
+        img = img.resize((max_width, new_height), Image.LANCZOS)
+        width, height = img.size
 
-    # Шрифт
+    # 3. Подготовка шрифта
+    draw_dummy = ImageDraw.Draw(img)
     font = None
     try:
         font_path = getattr(settings, "WATERMARK_FONT_PATH", None)
         if font_path:
             font = ImageFont.truetype(
                 font_path,
-                size=int(min(width, height) * 0.05),
+                size=int(min(width, height) * 0.06),  # размер от размеров фото
             )
     except Exception:
-        pass
+        font = None
 
     if font is None:
         font = ImageFont.load_default()
 
-    watermark_text = text or "WATERMARK"
+    watermark_text = text or "photoeasy"
 
-    # ------ ВАЖНО: новая версия Pillow ------
-    # textbbox = (x0, y0, x1, y1)
-    bbox = draw.textbbox((0, 0), watermark_text, font=font)
+    # Размер текста
+    bbox = draw_dummy.textbbox((0, 0), watermark_text, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
-    # ----------------------------------------
 
-    # Правый нижний угол
-    x = width - text_width - 20
-    y = height - text_height - 20
+    # 4. Слой для водяного знака (прозрачный)
+    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
 
-    fill = (255, 255, 255)
+    # Шаги по сетке
+    step_x = int(text_width * 3)
+    step_y = int(text_height * 3)
 
-    draw.text((x, y), watermark_text, font=font, fill=fill)
+    # Заполняем текстом (пока горизонтально)
+    alpha = 80  # прозрачность (0-255)
+    fill = (255, 255, 255, alpha)
 
+    # Чуть расширяем область, чтобы при повороте не появлялись пустые места
+    for y in range(-height, height * 2, step_y):
+        for x in range(-width, width * 2, step_x):
+            overlay_draw.text((x, y), watermark_text, font=font, fill=fill)
+
+    # 5. Поворачиваем слой с текстом для диагонального эффекта
+    rotated = overlay.rotate(-30, expand=True)
+    rw, rh = rotated.size
+
+    # Обрезаем обратно до размера изображения
+    left = (rw - width) // 2
+    top = (rh - height) // 2
+    rotated = rotated.crop((left, top, left + width, top + height))
+
+    # 6. Находим лицо и вырезаем его область из слоя водяного знака
+    face_boxes = []
+    try:
+        _ensure_face_libs_loaded()
+        arr = np.array(img, dtype=np.uint8)
+        arr = np.ascontiguousarray(arr)
+        locations = face_recognition.face_locations(
+            arr,
+            number_of_times_to_upsample=1,
+            model="hog",
+        )
+        for (top_f, right_f, bottom_f, left_f) in locations:
+            # немного увеличим рамку лица, чтобы точно ничего не задело
+            margin = int((bottom_f - top_f) * 0.25)
+            box = (
+                max(left_f - margin, 0),
+                max(top_f - margin, 0),
+                min(right_f + margin, width),
+                min(bottom_f + margin, height),
+            )
+            face_boxes.append(box)
+    except Exception:
+        face_boxes = []
+
+    if face_boxes:
+        cut_draw = ImageDraw.Draw(rotated)
+        for (lx, ty, rx, by) in face_boxes:
+            # полностью прозрачный прямоугольник по лицу
+            cut_draw.rectangle((lx, ty, rx, by), fill=(0, 0, 0, 0))
+
+    # 7. Склеиваем исходное изображение и водяной знак
+    img_rgba = img.convert("RGBA")
+    watermarked = Image.alpha_composite(img_rgba, rotated)
+
+    # 8. Сохраняем в JPEG и возвращаем байты
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=90)
+    watermarked.convert("RGB").save(buf, format="JPEG", quality=90)
     return buf.getvalue()

@@ -1,13 +1,17 @@
 import io
-from datetime import timedelta
+from django.http import HttpResponse
+from openpyxl import Workbook
 
-from django.contrib.auth import authenticate
+from datetime import timedelta
+from django.contrib.auth.decorators import login_required
+
+from django.contrib.auth import authenticate, get_user_model
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Sum, Count
 from django.db.models.functions import TruncDate
 from django.utils import timezone
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 
 from rest_framework import generics, permissions, viewsets
 from rest_framework.authtoken.models import Token
@@ -17,16 +21,244 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
-from .models import Photographer, PhotoSession, SessionPhoto, PhotoOrder
+from django.contrib.admin.views.decorators import staff_member_required
+from .models import Photographer, PhotoSession, SessionPhoto, PhotoOrder, Service
 from .serializers import (
     UserRegisterSerializer,
     PhotographerSerializer,
     PhotoSessionSerializer,
     SessionPhotoSerializer,
     PhotoOrderSerializer,
-    SessionPhotoGallerySerializer
+    SessionPhotoGallerySerializer,
+    ServiceSerializer
 )
-from .utils import extract_face_encoding_from_file, add_watermark_to_bytes, face_distance
+from .utils import (
+    extract_face_encoding_from_file,
+    add_watermark_to_bytes,
+    face_distance,
+)
+
+User = get_user_model()
+
+
+# ========== КАСТОМНАЯ АДМИН-ПАНЕЛЬ (ДОБРОВОЛЬНО) ==========
+
+@login_required
+def dashboard_export_xlsx(request):
+    """
+    XLSX-отчёт:
+    - superuser получает данные по всем фотографам
+    - обычный фотограф — только свои данные
+    """
+    user = request.user
+
+    # тот же scope, что и в dashboard_view
+    if user.is_superuser:
+        scope_label = "Все фотографы"
+        orders_qs = PhotoOrder.objects.all()
+        sessions_qs = PhotoSession.objects.all()
+        photos_qs = SessionPhoto.objects.all()
+    else:
+        if not hasattr(user, "photographer"):
+            scope_label = "Нет привязанного профиля фотографа"
+            orders_qs = PhotoOrder.objects.none()
+            sessions_qs = PhotoSession.objects.none()
+            photos_qs = SessionPhoto.objects.none()
+        else:
+            photographer = user.photographer
+            scope_label = f"Фотограф: {photographer.studio_name}"
+            orders_qs = PhotoOrder.objects.filter(photographer=photographer)
+            sessions_qs = PhotoSession.objects.filter(photographer=photographer)
+            photos_qs = SessionPhoto.objects.filter(session__photographer=photographer)
+
+    total_earning = orders_qs.aggregate(total=Sum("amount"))["total"] or 0
+    total_orders = orders_qs.count()
+    total_sessions = sessions_qs.count()
+    total_photos = photos_qs.count()
+
+    today = timezone.now().date()
+    from_date = today - timezone.timedelta(days=30)
+    recent_orders = orders_qs.filter(paid_at__date__gte=from_date)
+    last_30_days_earning = recent_orders.aggregate(total=Sum("amount"))["total"] or 0
+
+    # -------- создаём Excel --------
+    wb = Workbook()
+
+    # Лист 1: Summary
+    ws_summary = wb.active
+    ws_summary.title = "Сводка"
+
+    ws_summary.append(["Отчёт по:", scope_label])
+    ws_summary.append([])
+    ws_summary.append(["Показатель", "Значение"])
+    ws_summary.append(["Общая выручка", float(total_earning)])
+    ws_summary.append(["Выручка за 30 дней", float(last_30_days_earning)])
+    ws_summary.append(["Количество заказов", total_orders])
+    ws_summary.append(["Количество фотосессий", total_sessions])
+    ws_summary.append(["Количество фотографий", total_photos])
+
+    # Лист 2: Заказы
+    ws_orders = wb.create_sheet("Заказы")
+    ws_orders.append([
+        "ID заказа",
+        "Клиент",
+        "Телефон",
+        "Фотограф",
+        "Фотосессия",
+        "Оплачено (дата/время)",
+        "Сумма",
+        "Услуги",
+    ])
+
+    orders_qs = orders_qs.select_related("session", "photographer").prefetch_related("services")
+
+    for order in orders_qs.order_by("-paid_at"):
+        if order.photographer:
+            photographer_name = f"{order.photographer.studio_name}"
+        else:
+            photographer_name = ""
+
+        session_client = order.session.client_name if order.session else ""
+
+        # если ты добавил ManyToMany Service -> PhotoOrder
+        services_list = [s.name for s in order.services.all()] if hasattr(order, "services") else []
+        services_str = ", ".join(services_list)
+
+        ws_orders.append([
+            order.id,
+            order.client_name,
+            order.client_phone,
+            photographer_name,
+            session_client,
+            timezone.localtime(order.paid_at).strftime("%Y-%m-%d %H:%M") if order.paid_at else "",
+            float(order.amount),
+            services_str,
+        ])
+
+    # немного увеличить ширину колонок
+    for col in ws_orders.columns:
+        max_len = 0
+        col_letter = col[0].column_letter
+        for cell in col:
+            try:
+                value_len = len(str(cell.value))
+                if value_len > max_len:
+                    max_len = value_len
+            except Exception:
+                pass
+        ws_orders.column_dimensions[col_letter].width = max(max_len + 2, 12)
+
+    # -------- отдаём файл пользователю --------
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    filename = f"dashboard_{timezone.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    wb.save(response)
+    return response
+
+
+@login_required
+def dashboard(request):
+    users_active = User.objects.filter(is_active=True).count()
+    orders_count = PhotoOrder.objects.count()
+    sessions_count = PhotoSession.objects.count()
+    photos_count = SessionPhoto.objects.count()
+
+    context = {
+        "users_active": users_active,
+        "orders_count": orders_count,
+        "sessions_count": sessions_count,
+        "photos_count": photos_count,
+    }
+    return render(request, "dashboard.html", context)
+
+@login_required
+def dashboard_view(request):
+    user = request.user
+
+    if user.is_superuser:
+        scope_label = "Все фотографы"
+        orders_qs = PhotoOrder.objects.all()
+        sessions_qs = PhotoSession.objects.all()
+        photos_qs = SessionPhoto.objects.all()
+        services_qs = Service.objects.all()
+    else:
+        if not hasattr(user, "photographer"):
+            scope_label = "Нет привязанного профиля фотографа"
+            orders_qs = PhotoOrder.objects.none()
+            sessions_qs = PhotoSession.objects.none()
+            photos_qs = SessionPhoto.objects.none()
+            services_qs = Service.objects.none()
+        else:
+            photographer = user.photographer
+            scope_label = f"Фотограф: {photographer.studio_name}"
+
+            orders_qs = PhotoOrder.objects.filter(photographer=photographer)
+            sessions_qs = PhotoSession.objects.filter(photographer=photographer)
+            photos_qs = SessionPhoto.objects.filter(session__photographer=photographer)
+            services_qs = Service.objects.filter(photographer=photographer)
+
+    total_earning = orders_qs.aggregate(total=Sum("amount"))["total"] or 0
+    total_orders = orders_qs.count()
+    total_sessions = sessions_qs.count()
+    total_photos = photos_qs.count()
+
+    today = timezone.now().date()
+    from_date = today - timedelta(days=30)
+
+    recent_orders = orders_qs.filter(paid_at__date__gte=from_date)
+    last_30_days_earning = recent_orders.aggregate(total=Sum("amount"))["total"] or 0
+
+    earning_by_day = (
+        recent_orders
+        .annotate(day=TruncDate("paid_at"))
+        .values("day")
+        .annotate(total=Sum("amount"), count=Count("id"))
+        .order_by("day")
+    )
+
+    top_services = (
+        services_qs
+        .annotate(order_count=Count("orders"))
+        .order_by("-order_count")[:5]
+    )
+
+    latest_orders = (
+        orders_qs
+        .select_related("session", "photographer")
+        .order_by("-paid_at")[:10]
+    )
+
+    context = {
+        "scope_label": scope_label,
+        "total_earning": total_earning,
+        "total_orders": total_orders,
+        "total_sessions": total_sessions,
+        "total_photos": total_photos,
+        "last_30_days_earning": last_30_days_earning,
+        "earning_by_day": earning_by_day,
+        "top_services": top_services,
+        "latest_orders": latest_orders,
+    }
+    return render(request, "dashboard.html", context)
+
+
+@staff_member_required  # только для админов/персонала
+def dashboard(request):
+    users_active = User.objects.filter(is_active=True).count()
+    orders_count = PhotoOrder.objects.count()
+    sessions_count = PhotoSession.objects.count()
+    photos_count = SessionPhoto.objects.count()
+
+    context = {
+        "users_active": users_active,
+        "orders_count": orders_count,
+        "sessions_count": sessions_count,
+        "photos_count": photos_count,
+    }
+    return render(request, "admin_soft/dashboard.html", context)
 
 
 # ========== АУТЕНТИФИКАЦИЯ ==========
@@ -122,6 +354,22 @@ class PhotographerDashboardView(APIView):
         )
 
 
+class MyPhotoOrdersView(generics.ListAPIView):
+    """
+    GET /api/me/orders/
+    Список заказов ТОЛЬКО текущего фотографа.
+    """
+    serializer_class = PhotoOrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            PhotoOrder.objects
+            .filter(photographer=self.request.user.photographer)
+            .order_by("-paid_at")
+        )
+
+
 # ========== ФОТОСЕССИИ ==========
 
 class PhotoSessionViewSet(viewsets.ModelViewSet):
@@ -133,6 +381,7 @@ class PhotoSessionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # фотограф видит ТОЛЬКО свои сессии
         return PhotoSession.objects.filter(photographer=self.request.user.photographer)
 
     def perform_create(self, serializer):
@@ -156,7 +405,7 @@ class SessionPhotoBulkUploadView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        # находим сессию только этого фотографа
+        # находим сессию ТОЛЬКО этого фотографа
         session = get_object_or_404(
             PhotoSession,
             id=session_id,
@@ -193,26 +442,40 @@ class SessionPhotoBulkUploadView(generics.GenericAPIView):
         return Response(data, status=201)
 
 
-
-# ========== ПОИСК ПО ЛИЦУ ==========
+# ========== ПОИСК ПО ЛИЦУ (ДЛЯ КЛИЕНТА ПО КОНКРЕТНОЙ СЪЁМКЕ) ==========
 
 class FaceSearchView(APIView):
+    """
+    POST /api/search-by-face/?view_code=ABCD1234
+
+    Тело: form-data c полем image (фото/селфи).
+    Поиск ведём ТОЛЬКО по сессии с этим view_code.
+    """
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
         file = request.FILES.get("image")
+        view_code = request.query_params.get("view_code")
+
         if not file:
             return Response({"detail": "Не передано поле 'image'"}, status=400)
+
+        if not view_code:
+            return Response({"detail": "Не передан параметр 'view_code'"}, status=400)
+
+        # Находим сессию по view_code (это публичный код для клиентов)
+        session = get_object_or_404(PhotoSession, view_code=view_code)
 
         data = file.read()
         encoding = extract_face_encoding_from_file(ContentFile(data, name=file.name))
         if encoding is None:
             return Response({"detail": "Лицо не найдено на фото"}, status=400)
 
-        photos = SessionPhoto.objects.all()
+        # Берём только фото из этой сессии
+        photos = SessionPhoto.objects.filter(session=session)
         matches = []
-        THRESHOLD = 0.45
+        THRESHOLD = 0.45  # можно подкрутить
 
         for p in photos:
             if not p.face_encoding:
@@ -225,7 +488,9 @@ class FaceSearchView(APIView):
                 matches.append({
                     "photo_id": p.id,
                     "image_url": (
-                        p.watermarked_image.url if p.watermarked_image else p.original_image.url
+                        p.watermarked_image.url
+                        if p.watermarked_image
+                        else p.original_image.url
                     ),
                     "session_id": p.session_id,
                     "client_name": p.session.client_name,
@@ -235,8 +500,7 @@ class FaceSearchView(APIView):
         return Response({"matches": matches})
 
 
-
-# ========== ЗАКАЗЫ (после оплаты) ==========
+# ========== ЗАКАЗЫ (после оплаты клиентом) ==========
 
 class PhotoOrderCreateView(generics.CreateAPIView):
     """
@@ -270,12 +534,23 @@ class PhotoOrderCreateView(generics.CreateAPIView):
 
         serializer.save(photographer=photographer, session=session)
 
+
+# ========== СПИСОК ФОТО ДЛЯ КЛИЕНТА ПО view_code ==========
+
 class SessionPhotoListView(generics.ListAPIView):
     """
     GET /api/photos/?view_code=ABCD1234
 
-    Возвращает фото (с водяным знаком) для фотосессии с указанным view_code
-    + download_code этой сессии.
+    Возвращает:
+    {
+      "session": {
+          "id": ...,
+          "client_name": "...",
+          "view_code": "...",
+          "download_code": "..."
+      },
+      "photos": [ ... ]
+    }
     """
     serializer_class = SessionPhotoGallerySerializer
     permission_classes = [AllowAny]
@@ -315,5 +590,31 @@ class SessionPhotoListView(generics.ListAPIView):
                 "photos": response.data,
             })
 
-        # если кода нет – вернётся пустой список
+        # если кода нет – вернётся обычный пустой список
         return response
+
+
+class ServiceListView(generics.ListAPIView):
+    """
+    GET /api/services/?view_code=ABCD1234
+
+    Отдаёт список услуг фотографа:
+    - если передан view_code -> ищем сессию и берём её фотографа
+    - можно также передать photographer=<id>, если нужно.
+    """
+    serializer_class = ServiceSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        view_code = self.request.query_params.get("view_code")
+        photographer_id = self.request.query_params.get("photographer")
+
+        qs = Service.objects.filter(is_active=True)
+
+        if view_code:
+            session = get_object_or_404(PhotoSession, view_code=view_code)
+            qs = qs.filter(photographer=session.photographer)
+        elif photographer_id:
+            qs = qs.filter(photographer_id=photographer_id)
+
+        return qs

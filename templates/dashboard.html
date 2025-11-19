@@ -1,0 +1,791 @@
+{% load static math_filters %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard | Photostudio</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        :root {
+            --bg: #f5f6fa;
+            --bg-card: #ffffff;
+            --accent: #ff8a00;
+            --accent-soft: #ffe2c2;
+            --text-main: #1f2933;
+            --text-muted: #6b7280;
+            --border-soft: #e5e7eb;
+            --danger: #ef4444;
+            --success: #10b981;
+            --radius-lg: 18px;
+            --radius-md: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* SIDEBAR */
+
+        .sidebar {
+            width: 80px;
+            background: #ffffff;
+            border-right: 1px solid var(--border-soft);
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .sidebar-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #00c48c, #00a0ff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            color: #fff;
+            font-size: 20px;
+        }
+
+        .sidebar-nav {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .sidebar-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: 0.15s ease;
+        }
+
+        .sidebar-icon.active {
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        .sidebar-icon:hover {
+            background: #f3f4f6;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .sidebar-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 999px;
+            background: url("https://i.pravatar.cc/80") center/cover no-repeat;
+            border: 2px solid #e5e7eb;
+        }
+
+        /* MAIN */
+
+        .main {
+            flex: 1;
+            padding: 24px 28px 32px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .topbar-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .topbar-user {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .search-box {
+            background: #fff;
+            border-radius: 999px;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid var(--border-soft);
+            width: 260px;
+        }
+
+        .search-box input {
+            border: none;
+            outline: none;
+            font-size: 13px;
+            width: 100%;
+        }
+
+        .search-box span {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        /* HERO / HEADER */
+
+        .hero {
+            background: linear-gradient(135deg, #ff8a00, #ff6b1a);
+            color: #fff;
+            padding: 20px 24px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .hero-main h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .hero-sub {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        .hero-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.12);
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            margin-top: 10px;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            text-align: right;
+        }
+
+        .hero-amount {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .hero-tag {
+            font-size: 11px;
+            opacity: 0.9;
+        }
+
+        .hero-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 999px;
+            border: none;
+            cursor: pointer;
+            background: #fff;
+            color: #f97316;
+            font-weight: 600;
+        }
+
+        /* GRID MAIN */
+
+        .grid-main {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        /* KPI CARDS */
+
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-soft);
+        }
+
+        .kpi-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .kpi-value {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .kpi-sub {
+            font-size: 11px;
+            color: var(--success);
+        }
+
+        .kpi-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        /* CARDS */
+
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-soft);
+            padding: 16px 18px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .card-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* SIMPLE "CHARTS" */
+
+        .chart-row {
+            display: grid;
+            grid-template-columns: 2fr 1.5fr;
+            gap: 18px;
+        }
+
+        .bar-chart {
+            margin-top: 8px;
+            display: flex;
+            align-items: flex-end;
+            gap: 14px;
+            height: 140px;
+        }
+
+        .bar {
+            flex: 1;
+            border-radius: 10px 10px 4px 4px;
+            background: var(--accent-soft);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            position: relative;
+        }
+
+        .bar-inner {
+            width: 60%;
+            border-radius: inherit;
+            background: var(--accent);
+        }
+
+        .bar-label {
+            position: absolute;
+            bottom: -18px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .legend {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 4px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .legend-item span:first-child {
+            margin-right: 6px;
+        }
+
+        .pie-placeholder {
+            width: 120px;
+            height: 120px;
+            border-radius: 999px;
+            background: conic-gradient(#22c55e 0 40%, #facc15 40% 70%, #f97316 70% 100%);
+            margin: 12px auto 6px;
+            position: relative;
+        }
+
+        .pie-hole {
+            position: absolute;
+            inset: 20px;
+            border-radius: inherit;
+            background: #fff;
+        }
+
+        .pie-center {
+            position: absolute;
+            inset: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .pie-legend {
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* RIGHT SIDE STATS */
+
+        .progress-list {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .progress-item {
+            font-size: 12px;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+        }
+
+        .cycle-grid {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0,1fr));
+            gap: 8px;
+        }
+
+        .cycle-card {
+            border-radius: 10px;
+            border: 1px solid var(--border-soft);
+            padding: 8px 10px;
+            background: #f9fafb;
+        }
+
+        .cycle-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .cycle-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* BOTTOM TABLE */
+
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 18px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        thead {
+            background: #f9fafb;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 8px 8px;
+            border-bottom: 1px solid var(--border-soft);
+        }
+
+        th {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .status-badge {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-paid {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .service-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: #f9fafb;
+            border: 1px solid var(--border-soft);
+            font-size: 11px;
+            margin-bottom: 6px;
+        }
+
+        .service-pill span:first-child {
+            font-weight: 500;
+        }
+
+        .empty-text {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        @media (max-width: 1024px) {
+            .layout {
+                flex-direction: column;
+            }
+            .sidebar {
+                flex-direction: row;
+                width: 100%;
+                height: 60px;
+            }
+            .sidebar-nav {
+                flex-direction: row;
+                margin-top: 0;
+            }
+            .sidebar-footer {
+                margin-top: 0;
+                margin-left: auto;
+                flex-direction: row;
+            }
+            .main {
+                padding: 16px;
+            }
+            .grid-main, .bottom-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="layout">
+
+    <!-- Main -->
+    <main class="main">
+        <!-- top bar -->
+        <div class="topbar">
+            <div class="topbar-title">Dashboard</div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div class="search-box">
+                    <span>&#128270;</span>
+                    <input type="text" placeholder="Поиск по заказам...">
+                </div>
+                <div class="topbar-user">
+                    {{ request.user.username }}
+                </div>
+            </div>
+        </div>
+
+        <!-- hero -->
+        <section class="hero">
+            <div class="hero-main">
+                <h1>{{ scope_label }}</h1>
+                <div class="hero-sub">
+                    Общая выручка: {{ total_earning|floatformat:0 }} руб ·
+                    За последние 30 дней: {{ last_30_days_earning|floatformat:0 }} руб
+                </div>
+                <div class="hero-chip">
+                    <span style="width:8px;height:8px;border-radius:999px;background:#22c55e;"></span>
+                    Система активна · Фото, сессии и заказы обновляются в реальном времени
+                </div>
+            </div>
+            <div class="hero-actions">
+                <div class="hero-amount">
+                    {{ last_30_days_earning|floatformat:0 }} руб
+                </div>
+                <div class="hero-tag">Выручка за 30 дней</div>
+                <a href="{% url 'dashboard_export' %}" class="hero-btn">
+                    Экспорт отчёта
+                </a>
+            </div>
+        </section>
+
+        <!-- main grid -->
+        <section class="grid-main">
+            <div>
+                <!-- KPI row -->
+                <div class="kpi-row">
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span class="kpi-dot" style="background:#22c55e;"></span>
+                            Заказы
+                        </div>
+                        <div class="kpi-value">{{ total_orders }}</div>
+                        <div class="kpi-sub">Всего подтверждённых заказов</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span class="kpi-dot" style="background:#3b82f6;"></span>
+                            Фотосессии
+                        </div>
+                        <div class="kpi-value">{{ total_sessions }}</div>
+                        <div class="kpi-sub">Создано сессий</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span class="kpi-dot" style="background:#f97316;"></span>
+                            Фотографии
+                        </div>
+                        <div class="kpi-value">{{ total_photos }}</div>
+                        <div class="kpi-sub">Загружено снимков</div>
+                    </div>
+                </div>
+
+                <!-- charts -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Динамика заказов</div>
+                            <div class="card-subtitle">За последние 30 дней</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-row">
+                        <!-- simple bar chart (4 столбика с подписью) -->
+                        <div>
+                            <div class="bar-chart">
+                                {% for day in earning_by_day|slice:":4" %}
+                                    {% with height=25|add:forloop.counter0|add:"5" %}
+                                    <div class="bar">
+                                        <div class="bar-inner" style="height: {{ height }}%;"></div>
+                                        <span class="bar-label">
+                                            {{ day.day|date:"d.m" }}
+                                        </span>
+                                    </div>
+                                    {% endwith %}
+                                {% empty %}
+                                    <p class="empty-text">Пока нет заказов за последние 30 дней.</p>
+                                {% endfor %}
+                            </div>
+                            <div class="legend">
+                                <div class="legend-item">
+                                    <span class="kpi-dot" style="background:#22c55e;"></span>
+                                    Выручка по дням
+                                </div>
+                                <div class="legend-item">
+                                    <span class="kpi-dot" style="background:#e5e7eb;"></span>
+                                    Доход сглажен
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- donut -->
+                        <div>
+                            <div class="pie-placeholder">
+                                <div class="pie-hole"></div>
+                                <div class="pie-center">
+                                    <div>
+                                        {{ last_30_days_earning|floatformat:0 }} руб<br>
+                                        <span style="font-size:10px;">30 дней</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="pie-legend">
+                                <div><span class="kpi-dot" style="background:#22c55e;"></span> В пределах месяца</div>
+                                <div><span class="kpi-dot" style="background:#facc15;"></span> Старые заказы</div>
+                                <div><span class="kpi-dot" style="background:#f97316;"></span> Потенциал роста</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- right column: services & cycle -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Популярные услуги</div>
+                            <div class="card-subtitle">ТОП по количеству заказов</div>
+                        </div>
+                    </div>
+
+                    <div class="progress-list">
+                        {% for s in top_services %}
+                            {% with pct=s.order_count|add:"1"|mul:10 %}
+                            <div class="progress-item">
+                                <div class="progress-header">
+                                    <span>{{ s.name }}</span>
+                                    <span>{{ s.order_count }} заказ(ов)</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: {{ pct }}%;"></div>
+                                </div>
+                            </div>
+                            {% endwith %}
+                        {% empty %}
+                            <p class="empty-text">Услуги ещё не были выбраны в заказах.</p>
+                        {% endfor %}
+                    </div>
+
+                    <div class="cycle-grid">
+                        <div class="cycle-card">
+                            <div class="cycle-label">Средний чек</div>
+                            <div class="cycle-value">
+                                {% if total_orders %}
+                                    {{ total_earning|div:total_orders|floatformat:0 }} руб
+                                {% else %}
+                                    0 руб
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="cycle-card">
+                            <div class="cycle-label">Всего выручка</div>
+                            <div class="cycle-value">{{ total_earning|floatformat:0 }} руб</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- bottom -->
+        <section class="bottom-grid">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Последние заказы</div>
+                        <div class="card-subtitle">10 самых свежих оплат</div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Клиент</th>
+                        <th>Фотосессия</th>
+                        <th>Сумма</th>
+                        <th>Оплачено</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for order in latest_orders %}
+                        <tr>
+                            <td>{{ order.id }}</td>
+                            <td>{{ order.client_name }}</td>
+                            <td>
+                                {% if order.session %}
+                                    {{ order.session.client_name }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>{{ order.amount }} руб</td>
+                            <td>
+                                <span class="status-badge status-paid">
+                                    {{ order.paid_at|date:"d.m.Y" }}
+                                </span>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5">Заказов пока нет.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Услуги (быстрый обзор)</div>
+                        <div class="card-subtitle">ТОП-5 услуг по количеству заказов</div>
+                    </div>
+                </div>
+
+                {% for s in top_services %}
+                    <div class="service-pill">
+                        <span>{{ s.name }}</span>
+                        <span>{{ s.order_count }} заказ(ов)</span>
+                    </div>
+                {% empty %}
+                    <p class="empty-text">Услуги ещё не созданы или не использовались.</p>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+</div>
+
+</body>
+</html>

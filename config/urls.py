@@ -6,6 +6,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("photostudio.urls")),
+    path("", include("photostudio.urls")),  # или другое имя приложения
 ]
 
 if settings.DEBUG:
