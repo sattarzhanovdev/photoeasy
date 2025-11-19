@@ -154,3 +154,5 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 SUPERUSER_EMAIL = os.getenv('SUPERUSER_EMAIL', default='admin123@example.com')
 SUPERUSER_NAME = os.getenv('SUPERUSER_NAME', default='admin123')
 SUPERUSER_PASSWORD = os.getenv('SUPERUSER_PASSWORD', default='super-secret')
+MEDIA_ROOT= os.path.join(BASE_DIR, 'photos')
+MEDIA_URL = 'photos/'
