@@ -11,6 +11,7 @@ RUN apt-get update -y && \
     build-essential \
     cmake \
     pkg-config \
+    libopenblas-dev liblapack-dev \
     libavutil-dev \
     && \
     rm -rf /var/lib/apt/lists/*
