@@ -14,8 +14,8 @@ services:
     cpus: 0.5
 
     volumes:
-      - media_volume:/app/media
-      - static_volume:/app/static
+      - media_volume:/app/photos
+      - static_volume:/app/staticfiles
       - sqlite_volume:/app/db
     expose:
       - 8000
@@ -37,8 +37,8 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
 #      - /etc/letsencrypt:/etc/letsencrypt:ro
-      - media_volume:/app/media
-      - static_volume:/app/static
+      - media_volume:/app/photos
+      - static_volume:/app/staticfiles
     depends_on:
       - backend
     restart: unless-stopped
