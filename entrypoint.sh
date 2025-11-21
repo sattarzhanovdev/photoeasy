@@ -23,4 +23,4 @@ if not User.objects.filter(username=settings.SUPERUSER_NAME).exists() or not Use
 "
 
 echo "Запускаем сервер"
-exec gunicorn config.wsgi:application --workers 2 --bind 0.0.0.0:8000
+exec gunicorn config.wsgi:application --workers 1 --bind 0.0.0.0:8000
